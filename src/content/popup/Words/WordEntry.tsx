@@ -150,7 +150,7 @@ export function WordEntry(props: WordEntryProps) {
         'tp:no-overlay:data-flash:animate-flash',
         // Anki duplicate indicator — only show the checkmark; do not change row opacity
         /* duplicate state intentionally does not change row opacity */
-        props.ankiState === 'added' && 'tp:bg-green-50/60',
+        props.ankiState === 'added' && 'tp:bg-transparent',
         props.ankiState === 'adding' && 'tp:bg-blue-50/60',
         props.ankiState === 'error' && 'tp:bg-red-50/60',
         ...(interactive

@@ -181,8 +181,8 @@
   --cell-bg-hover: hsl(12, 4.4%, 22.2%);
   --cell-link-fg: var(--primary-highlight);
 
-  --selected-bg: #555;
-  --hover-bg: #484844;
+  --selected-bg: #313131;
+  --hover-bg: #3232328b;
 
   /* Reset selection styles */
   --selected-highlight: var(--primary-highlight);
