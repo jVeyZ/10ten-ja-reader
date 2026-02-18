@@ -62,6 +62,8 @@ import { omit } from '../utils/omit';
 import type { Split } from '../utils/type-helpers';
 
 import TabManager from './all-tab-manager';
+import { AnkiConnect } from './anki-connect';
+import { fetchAndStoreAudio } from './audio-fetcher';
 import type { SearchOtherRequest, SearchRequest } from './background-request';
 import { BackgroundRequestSchema } from './background-request';
 import { setDefaultToolbarIcon, updateBrowserAction } from './browser-action';
@@ -95,6 +97,7 @@ startBugsnag();
 
 const tabManager = new TabManager();
 const fxFetcher = new FxFetcher();
+const ankiConnect = new AnkiConnect();
 
 tabManager.addListener(
   async ({
@@ -215,6 +218,14 @@ config.addChangeListener(async (changes) => {
     updateDb({ lang: newLang, force: true });
   }
 
+  // Update AnkiConnect settings
+  if (changes.hasOwnProperty('ankiConnect')) {
+    const ankiSettings = config.ankiConnect;
+    ankiConnect.enabled = ankiSettings.enabled;
+    ankiConnect.server = ankiSettings.server;
+    ankiConnect.apiKey = ankiSettings.apiKey || null;
+  }
+
   // Tell the content scripts about any changes
   await tabManager.updateConfig(config.contentConfig);
 });
@@ -225,6 +236,12 @@ void config.ready.then(async () => {
   if (config.toolbarIcon !== 'default') {
     setDefaultToolbarIcon(config.toolbarIcon);
   }
+
+  // Initialize AnkiConnect with stored settings
+  const ankiSettings = config.ankiConnect;
+  ankiConnect.enabled = ankiSettings.enabled;
+  ankiConnect.server = ankiSettings.server;
+  ankiConnect.apiKey = ankiSettings.apiKey || null;
 
   // Initialize the tab manager first since we'll need its enabled state for
   // a number of other things.
@@ -614,6 +631,109 @@ browser.runtime.onMessage.addListener(
 
       case 'isDbUpdating':
         return Promise.resolve(isDbUpdating());
+
+      //
+      // AnkiConnect messages
+      //
+
+      case 'ankiIsConnected':
+        return (async () => {
+          try {
+            return await ankiConnect.isConnected();
+          } catch (e) {
+            console.error('AnkiConnect isConnected error:', e);
+            return false;
+          }
+        })();
+
+      case 'ankiGetVersion':
+        return (async () => {
+          try {
+            return await ankiConnect.getVersion();
+          } catch (e) {
+            console.error('AnkiConnect getVersion error:', e);
+            return null;
+          }
+        })();
+
+      case 'ankiGetDeckNames':
+        return (async () => {
+          try {
+            return await ankiConnect.getDeckNames();
+          } catch (e) {
+            console.error('AnkiConnect getDeckNames error:', e);
+            return [];
+          }
+        })();
+
+      case 'ankiGetModelNames':
+        return (async () => {
+          try {
+            return await ankiConnect.getModelNames();
+          } catch (e) {
+            console.error('AnkiConnect getModelNames error:', e);
+            return [];
+          }
+        })();
+
+      case 'ankiGetModelFieldNames':
+        return (async () => {
+          try {
+            return await ankiConnect.getModelFieldNames(request.modelName);
+          } catch (e) {
+            console.error('AnkiConnect getModelFieldNames error:', e);
+            return [];
+          }
+        })();
+
+      case 'ankiFetchAudio':
+        return (async () => {
+          try {
+            const filename = await fetchAndStoreAudio(
+              ankiConnect,
+              request.expression,
+              request.reading
+            );
+            return filename || '';
+          } catch (e) {
+            console.error('ankiFetchAudio error:', e);
+            return '';
+          }
+        })();
+
+      case 'ankiAddNote':
+        return (async () => {
+          try {
+            const noteId = await ankiConnect.addNote(request.note);
+            return { success: true, noteId };
+          } catch (e) {
+            console.error('AnkiConnect addNote error:', e);
+            return {
+              success: false,
+              error: e instanceof Error ? e.message : String(e),
+            };
+          }
+        })();
+
+      case 'ankiCanAddNotes':
+        return (async () => {
+          try {
+            return await ankiConnect.canAddNotes(request.notes);
+          } catch (e) {
+            console.error('AnkiConnect canAddNotes error:', e);
+            return new Array(request.notes.length).fill(false);
+          }
+        })();
+
+      case 'ankiFindNotes':
+        return (async () => {
+          try {
+            return await ankiConnect.findNotes(request.query);
+          } catch (e) {
+            console.error('AnkiConnect findNotes error:', e);
+            return [];
+          }
+        })();
 
       //
       // Forwarded messages

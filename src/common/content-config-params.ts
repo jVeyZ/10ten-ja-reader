@@ -1,3 +1,4 @@
+import type { AnkiSettings } from './anki-types';
 import type { PuckState } from './puck-state';
 import type { ReferenceAbbreviation } from './refs';
 
@@ -149,6 +150,9 @@ export interface ContentConfigParams {
   // Indicates the orientation / visibility of the popup tab bar.
   tabDisplay: TabDisplay;
 
+  // Minimum popup height in pixels (used as --tenten-min-height).
+  popupMinHeight: number;
+
   // The icon we show on the toolbar. We mirror this in the puck so we need to
   // let the content script now about it.
   toolbarIcon: 'default' | 'sky';
@@ -159,4 +163,7 @@ export interface ContentConfigParams {
   // where we guess the level for words not in the WaniKani database based on
   // the kanji they contain.)
   waniKaniVocabDisplay: 'hide' | 'show-matches';
+
+  // AnkiConnect settings for adding words to Anki.
+  ankiConnect: AnkiSettings;
 }

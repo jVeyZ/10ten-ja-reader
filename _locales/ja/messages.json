@@ -1669,6 +1669,7 @@
     "description": "Label for the key to force looking up the kanji dictionary only"
   },
   "options_popup_keys_subheading": { "message": "ポップアップキー" },
+  "options_popup_min_height_label": { "message": "ポップアップの最小高さ" },
   "options_popup_move_popup_down_or_up": {
     "message": "ポップアップを下・上にずらす",
     "description": "Note that it is important that down comes before up"

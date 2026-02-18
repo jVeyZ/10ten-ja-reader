@@ -177,6 +177,9 @@ export class ContentConfig implements ContentConfigParams {
   get popupStyle() {
     return this.params.popupStyle;
   }
+  get popupMinHeight() {
+    return this.params.popupMinHeight;
+  }
   get posDisplay() {
     return this.params.posDisplay;
   }
@@ -216,6 +219,9 @@ export class ContentConfig implements ContentConfigParams {
   }
   get waniKaniVocabDisplay() {
     return this.params.waniKaniVocabDisplay;
+  }
+  get ankiConnect() {
+    return this.params.ankiConnect;
   }
 
   // Extra computed properties

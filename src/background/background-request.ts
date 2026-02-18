@@ -54,6 +54,59 @@ export const BackgroundRequestSchema = discriminator('type', {
   translate: s.type({ input: s.string() }),
 
   //
+  // AnkiConnect requests
+  //
+  ankiIsConnected: s.type({}),
+  ankiGetVersion: s.type({}),
+  ankiGetDeckNames: s.type({}),
+  ankiGetModelNames: s.type({}),
+  ankiGetModelFieldNames: s.type({ modelName: s.string() }),
+  // Request a small audio file (fetched & stored by the background page).
+  // Returns the filename stored into Anki's media directory (or an empty
+  // string on failure).
+  ankiFetchAudio: s.type({
+    expression: s.string(),
+    reading: s.optional(s.string()),
+  }),
+  ankiAddNote: s.type({
+    note: s.object({
+      deckName: s.string(),
+      modelName: s.string(),
+      fields: s.record(s.string(), s.string()),
+      tags: s.array(s.string()),
+      options: s.optional(
+        s.object({
+          allowDuplicate: s.boolean(),
+          duplicateScope: s.optional(
+            s.enums(['collection', 'deck', 'deck-root'])
+          ),
+          duplicateScopeOptions: s.optional(
+            s.object({
+              deckName: s.optional(s.string()),
+              checkChildren: s.optional(s.boolean()),
+              checkAllModels: s.optional(s.boolean()),
+            })
+          ),
+        })
+      ),
+    }),
+  }),
+  ankiCanAddNotes: s.type({
+    notes: s.array(
+      s.object({
+        deckName: s.string(),
+        modelName: s.string(),
+        fields: s.record(s.string(), s.string()),
+        tags: s.array(s.string()),
+        options: s.optional(s.any()),
+      })
+    ),
+  }),
+  // Search for notes matching an Anki query string.
+  // Used for more precise duplicate verification (expression + reading).
+  ankiFindNotes: s.type({ query: s.string() }),
+
+  //
   // Requests to be forwarded to different frames
   //
 

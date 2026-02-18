@@ -36,6 +36,7 @@ export default function PopupStyleFormFixture() {
 
   const [fontSize, setFontSize] = useState<FontSize>('normal');
   const [fontFace, setFontFace] = useState<FontFace>('bundled');
+  const [popupMinHeight, setPopupMinHeight] = useState<number>(350);
 
   return (
     <PopupStyleForm
@@ -61,6 +62,8 @@ export default function PopupStyleFormFixture() {
       showRomaji={showRomaji}
       showWaniKaniLevel={showWaniKaniLevel}
       theme={theme}
+      popupMinHeight={popupMinHeight}
+      onChangePopupMinHeight={setPopupMinHeight}
     />
   );
 }

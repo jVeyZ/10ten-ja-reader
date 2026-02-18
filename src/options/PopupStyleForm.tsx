@@ -27,6 +27,9 @@ type Props = {
   onChangeShowRomaji: (value: boolean) => void;
   onChangeShowWaniKaniLevel: (value: boolean) => void;
   onChangeTheme: (theme: string) => void;
+  /** Minimum popup height in pixels */
+  popupMinHeight: number;
+  onChangePopupMinHeight: (value: number) => void;
   posDisplay: PartOfSpeechDisplay;
   showBunproDecks: boolean;
   showDefinitions: boolean;
@@ -105,6 +108,27 @@ export function PopupStyleForm(props: Props) {
           />
           <label for="showDefinitions">{t('options_show_definitions')}</label>
         </CheckboxRow>
+      </div>
+
+      <div class="grid grid-cols-[auto_auto] items-center gap-4">
+        <label for="popupMinHeight">
+          {t('options_popup_min_height_label')}
+        </label>
+        <div class="flex items-center gap-3">
+          <input
+            id="popupMinHeight"
+            name="popupMinHeight"
+            type="number"
+            min={100}
+            step={10}
+            value={String(props.popupMinHeight)}
+            onInput={(e) =>
+              props.onChangePopupMinHeight(Number(e.currentTarget.value || 0))
+            }
+            class="w-20"
+          />
+          <span class="text-muted text-sm">px</span>
+        </div>
       </div>
       <div class="grid w-fit grid-cols-[repeat(2,auto)] items-baseline gap-4">
         <label for="accentDisplay">{t('options_accent_display_label')}</label>

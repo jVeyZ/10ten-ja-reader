@@ -27,6 +27,14 @@ export function PopupStyleSettings(props: Props) {
     [props.config]
   );
 
+  const popupMinHeight = useConfigValue(props.config, 'popupMinHeight');
+  const onChangePopupMinHeight = useCallback(
+    (value: number) => {
+      props.config.popupMinHeight = value;
+    },
+    [props.config]
+  );
+
   const showPriority = useConfigValue(props.config, 'showPriority');
   const onChangeShowPriority = useCallback(
     (value: boolean) => {
@@ -130,6 +138,8 @@ export function PopupStyleSettings(props: Props) {
           onChangeShowRomaji={onChangeShowRomaji}
           onChangeShowWaniKaniLevel={onChangeShowWaniKaniLevel}
           onChangeTheme={onChangeTheme}
+          popupMinHeight={popupMinHeight}
+          onChangePopupMinHeight={onChangePopupMinHeight}
           posDisplay={posDisplay}
           showBunproDecks={showBunproDecks}
           showDefinitions={showDefinitions}

@@ -9,6 +9,7 @@ import { classes } from '../../../utils/classes';
 import { Star } from '../Icons/Star';
 import { usePopupOptions } from '../options-context';
 import { serializeReasonChains } from '../serialize-reasons';
+import type { AnkiEntryState } from '../show-popup';
 
 import { Definitions } from './Definitions';
 import { HeadwordInfo } from './HeadwordInfo';
@@ -32,6 +33,7 @@ export type WordEntryProps = {
   entry: WordResult;
   config: WordEntryConfig;
   selectState: SelectState;
+  ankiState?: AnkiEntryState;
   onPointerUp?: (evt: PointerEvent) => void;
   onClick?: (evt: MouseEvent) => void;
 };
@@ -146,6 +148,11 @@ export function WordEntry(props: WordEntryProps) {
         // Run the flash animation, but not until the overlay has
         // disappeared.
         'tp:no-overlay:data-flash:animate-flash',
+        // Anki duplicate indicator — only show the checkmark; do not change row opacity
+        /* duplicate state intentionally does not change row opacity */
+        props.ankiState === 'added' && 'tp:bg-green-50/60',
+        props.ankiState === 'adding' && 'tp:bg-blue-50/60',
+        props.ankiState === 'error' && 'tp:bg-red-50/60',
         ...(interactive
           ? [
               'tp:hover:bg-(--hover-bg)',
@@ -169,6 +176,9 @@ export function WordEntry(props: WordEntryProps) {
             {t('content_sk_match_src', searchOnlyMatch)}
           </div>
         )}
+
+        {/* Anki state indicator */}
+        {props.ankiState && <AnkiStateIndicator state={props.ankiState} />}
 
         {matchingKanji.length > 0 && (
           <span
@@ -388,4 +398,117 @@ function BunproTag({
       )}
     </span>
   );
+}
+
+function AnkiStateIndicator({ state }: { state: AnkiEntryState }) {
+  switch (state) {
+    case 'duplicate':
+      return (
+        <span
+          class="tp:inline-flex tp:items-center tp:mr-1.5 tp:text-green-600 tp:align-middle"
+          title="Already in Anki"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            class="tp:size-3.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M3 8l3.5 3.5L13 5" />
+          </svg>
+        </span>
+      );
+
+    case 'added':
+      return (
+        <span
+          class="tp:inline-flex tp:items-center tp:mr-1.5 tp:text-green-600 tp:align-middle"
+          title="Added to Anki"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            class="tp:size-3.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
+            <path d="M3 8l3.5 3.5L13 5" />
+          </svg>
+        </span>
+      );
+
+    case 'adding':
+      return (
+        <span
+          class="tp:inline-flex tp:items-center tp:mr-1.5 tp:text-blue-500 tp:align-middle"
+          title="Adding to Anki..."
+        >
+          <svg viewBox="0 0 16 16" class="tp:size-3.5 tp:animate-spin">
+            <circle
+              cx="8"
+              cy="8"
+              r="6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              opacity="0.3"
+            />
+            <path
+              d="M8 2a6 6 0 0 1 6 6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
+      );
+
+    case 'error':
+      return (
+        <span
+          class="tp:inline-flex tp:items-center tp:mr-1.5 tp:text-red-500 tp:align-middle"
+          title="Failed to add"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            class="tp:size-3.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="8" cy="8" r="6" />
+            <path d="M6 6l4 4M10 6l-4 4" />
+          </svg>
+        </span>
+      );
+
+    case 'checking':
+      return (
+        <span class="tp:inline-flex tp:items-center tp:mr-1.5 tp:text-gray-400 tp:align-middle">
+          <svg viewBox="0 0 16 16" class="tp:size-3 tp:animate-spin">
+            <circle
+              cx="8"
+              cy="8"
+              r="6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              opacity="0.3"
+            />
+            <path
+              d="M8 2a6 6 0 0 1 6 6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
+      );
+
+    default:
+      return null;
+  }
 }

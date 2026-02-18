@@ -8,6 +8,7 @@ import type {
 } from '../../../common/content-config-params';
 import { classes } from '../../../utils/classes';
 
+import type { CopyEntry } from '../../copy-text';
 import type { SelectionMeta } from '../../meta';
 import type { NamePreview as QueryNamePreview } from '../../query';
 
@@ -16,7 +17,7 @@ import type { CopyState } from '../copy-state';
 import { usePopupOptions } from '../options-context';
 import { getSelectedIndex } from '../selected-index';
 import { containerHasSelectedText } from '../selection';
-import type { StartCopyCallback } from '../show-popup';
+import type { AnkiEntryState, StartCopyCallback } from '../show-popup';
 
 import { NamePreview } from './NamePreview';
 import type { WordEntryConfig } from './WordEntry';
@@ -35,6 +36,9 @@ export type WordTableProps = {
   config: WordTableConfig;
   copyState: CopyState;
   onStartCopy?: StartCopyCallback;
+  ankiEnabled?: boolean;
+  ankiEntryStates?: Map<string, AnkiEntryState>;
+  onAddEntryToAnki?: (entryKey: string, entry: CopyEntry) => void;
 };
 
 export const WordTable = (props: WordTableProps) => {
@@ -136,6 +140,7 @@ export const WordTable = (props: WordTableProps) => {
               entry={entry}
               config={props.config}
               selectState={selectState}
+              ankiState={props.ankiEntryStates?.get(`word-${entry.id}`)}
               onPointerUp={(evt) => {
                 lastPointerType.current = evt.pointerType;
               }}
@@ -149,6 +154,15 @@ export const WordTable = (props: WordTableProps) => {
 
                 // Don't trigger copy mode if we clicked a nested link
                 if (evt.target instanceof HTMLAnchorElement) {
+                  return;
+                }
+
+                // When Anki is enabled, clicking adds to Anki directly
+                if (props.ankiEnabled && props.onAddEntryToAnki) {
+                  props.onAddEntryToAnki(`word-${entry.id}`, {
+                    type: 'word',
+                    data: entry,
+                  });
                   return;
                 }
 

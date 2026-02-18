@@ -1,5 +1,12 @@
-minimumReleaseAge: 1440 # 1 day
+minimumReleaseAge: 1440
+
 minimumReleaseAgeExclude:
   - '@birchill/*'
+
 onlyBuiltDependencies:
   - '@bugsnag/cli'
+  - core-js
+  - edgedriver
+  - esbuild
+  - geckodriver
+  - spawn-sync

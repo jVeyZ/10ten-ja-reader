@@ -45,6 +45,9 @@ export function renderWordEntries({
         },
         copyState: options.copyState,
         onStartCopy: options.onStartCopy,
+        ankiEnabled: options.ankiEnabled,
+        ankiEntryStates: options.ankiEntryStates,
+        onAddEntryToAnki: options.onAddEntryToAnki,
       })
     ),
     containerElement

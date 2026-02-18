@@ -18,6 +18,8 @@ import { isObject } from '../utils/is-object';
 import { omit } from '../utils/omit';
 import { isSafari } from '../utils/ua-utils';
 
+import type { AnkiSettings } from './anki-types';
+import { DEFAULT_ANKI_SETTINGS } from './anki-types';
 import type {
   AccentDisplay,
   AutoExpandableEntry,
@@ -81,6 +83,7 @@ interface Settings {
   };
   noTextHighlight?: boolean;
   popupStyle?: string;
+  popupMinHeight?: number;
   posDisplay?: PartOfSpeechDisplay;
   preferredUnits?: 'metric' | 'imperial';
   readingOnly?: boolean;
@@ -90,6 +93,7 @@ interface Settings {
   tabDisplay?: TabDisplay;
   toolbarIcon?: 'default' | 'sky';
   waniKaniVocabDisplay?: 'hide' | 'show-matches';
+  ankiConnect?: AnkiSettings;
 }
 
 type StorageChange = { oldValue?: any; newValue?: any };
@@ -1117,6 +1121,19 @@ export class Config {
     }
   }
 
+  // popupMinHeight: Defaults to 350px
+
+  get popupMinHeight(): number {
+    return typeof this.settings.popupMinHeight === 'undefined'
+      ? 350
+      : this.settings.popupMinHeight;
+  }
+
+  set popupMinHeight(value: number) {
+    this.settings.popupMinHeight = value;
+    void browser.storage.sync.set({ popupMinHeight: value });
+  }
+
   // posDisplay: Defaults to expl
 
   get posDisplay(): PartOfSpeechDisplay {
@@ -1355,6 +1372,17 @@ export class Config {
     }
   }
 
+  // ankiConnect: Defaults to DEFAULT_ANKI_SETTINGS
+
+  get ankiConnect(): AnkiSettings {
+    return this.settings.ankiConnect ?? { ...DEFAULT_ANKI_SETTINGS };
+  }
+
+  set ankiConnect(value: AnkiSettings) {
+    this.settings.ankiConnect = value;
+    void browser.storage.sync.set({ ankiConnect: value });
+  }
+
   // Get all the options the content process cares about at once
   get contentConfig(): ContentConfigParams {
     return {
@@ -1389,6 +1417,7 @@ export class Config {
       noTextHighlight: this.noTextHighlight,
       popupInteractive: this.popupInteractive,
       popupStyle: this.popupStyle,
+      popupMinHeight: this.popupMinHeight,
       posDisplay: this.posDisplay,
       preferredUnits: this.preferredUnits,
       puckState: this.puckState,
@@ -1400,6 +1429,7 @@ export class Config {
       tabDisplay: this.tabDisplay,
       toolbarIcon: this.toolbarIcon,
       waniKaniVocabDisplay: this.waniKaniVocabDisplay,
+      ankiConnect: this.ankiConnect,
     };
   }
 }

@@ -12,6 +12,7 @@ import type { ReferenceAbbreviation } from '../../common/refs';
 import type { Box, Point } from '../../utils/geometry';
 import { omit } from '../../utils/omit';
 
+import type { CopyEntry } from '../copy-text';
 import type { SelectionMeta } from '../meta';
 import type { DisplayMode } from '../popup-state';
 import type { QueryResult } from '../query';
@@ -32,6 +33,11 @@ import { renderPopup, renderPopupArrow } from './render-popup';
 export type ShowPopupOptions = {
   allowOverlap?: boolean;
   accentDisplay: AccentDisplay;
+  ankiEnabled?: boolean;
+  /** Map of entry keys to their Anki state ('checking' | 'available' | 'duplicate' | 'adding' | 'added' | 'error') */
+  ankiEntryStates?: Map<string, AnkiEntryState>;
+  /** Callback to add a specific entry to Anki (entry-level, not note-level) */
+  onAddEntryToAnki?: (entryKey: string, entry: CopyEntry) => void;
   bunproDisplay: boolean;
   closeShortcuts?: ReadonlyArray<string>;
   container?: HTMLElement;
@@ -47,6 +53,8 @@ export type ShowPopupOptions = {
   displayMode: DisplayMode;
   fixedPosition?: PopupPositionConstraints;
   fixMinHeight?: boolean;
+  /** Minimum popup height (px) applied as --tenten-min-height */
+  popupMinHeight?: number;
   fontFace?: FontFace;
   fontSize?: FontSize;
   fxData: ContentConfigParams['fx'];
@@ -81,6 +89,14 @@ export type ShowPopupOptions = {
   tabDisplay: 'top' | 'left' | 'right' | 'none';
   waniKaniVocabDisplay: 'hide' | 'show-matches';
 };
+
+export type AnkiEntryState =
+  | 'checking'
+  | 'available'
+  | 'duplicate'
+  | 'adding'
+  | 'added'
+  | 'error';
 
 export type StartCopyCallback = (
   index: number,

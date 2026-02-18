@@ -70,6 +70,7 @@ import { omit } from '../utils/omit';
 import type { WithRequired } from '../utils/type-helpers';
 import { isSafari } from '../utils/ua-utils';
 
+import { buildAnkiNote } from './anki-note-builder';
 import { copyText } from './clipboard';
 import type { ContentConfigChange } from './content-config';
 import { ContentConfig } from './content-config';
@@ -103,7 +104,11 @@ import {
   type PopupPositionConstraints,
   PopupPositionMode,
 } from './popup/popup-position';
-import { type ShowPopupOptions, showPopup } from './popup/show-popup';
+import {
+  type AnkiEntryState,
+  type ShowPopupOptions,
+  showPopup,
+} from './popup/show-popup';
 import { showWordsTab } from './popup/tabs';
 import type { PuckPointerEvent } from './puck';
 import { LookupPuck, isPuckPointerEvent, removePuck } from './puck';
@@ -250,6 +255,9 @@ export class ContentHandler {
   // (copyMode is actually used by the text-handling window too to know which
   // keyboard events to handle and how to interpret them.)
   private copyState: CopyState = { kind: 'inactive' };
+
+  // Anki entry state tracking
+  private ankiEntryStates: Map<string, AnkiEntryState> = new Map();
 
   // Manual positioning support
   private popupPositionMode: PopupPositionMode = PopupPositionMode.Auto;
@@ -1753,6 +1761,295 @@ export class ContentHandler {
     return copyEntry;
   }
 
+  private getAnkiPopupOptions(): {
+    ankiEnabled?: boolean;
+    ankiEntryStates?: Map<string, AnkiEntryState>;
+    onAddEntryToAnki?: (entryKey: string, entry: CopyEntry) => void;
+  } {
+    const ankiSettings = this.config.ankiConnect;
+    if (!ankiSettings?.enabled) {
+      return {};
+    }
+
+    return {
+      ankiEnabled: true,
+      ankiEntryStates: this.ankiEntryStates,
+      onAddEntryToAnki: (entryKey: string, entry: CopyEntry) => {
+        void this.addEntryToAnki(entryKey, entry);
+      },
+    };
+  }
+
+  private async addEntryToAnki(entryKey: string, entry: CopyEntry) {
+    const ankiSettings = this.config.ankiConnect;
+    if (!ankiSettings?.enabled) {
+      return;
+    }
+
+    // Don't re-add if already in progress or added
+    const currentState = this.ankiEntryStates.get(entryKey);
+    if (
+      currentState === 'adding' ||
+      currentState === 'added' ||
+      currentState === 'duplicate'
+    ) {
+      return;
+    }
+
+    this.ankiEntryStates.set(entryKey, 'adding');
+    this.updatePopup();
+
+    try {
+      // If any Anki field template references {audio} / {audio-file},
+      // attempt a background fetch + Anki media store and inject the
+      // stored filename into the template via markerOverrides.
+      let markerOverrides: Record<string, string> | undefined;
+      const templates = Object.values(ankiSettings.fieldTemplates || {});
+      const needsAudio = templates.some((t) =>
+        /\{(?:audio|audio-file)\}/.test(t)
+      );
+
+      if (needsAudio && entry.type === 'word') {
+        // Derive a sensible expression and reading for the audio request
+        // (mirrors the logic in buildWordMarkers).
+        const word = entry.data;
+        const kanjiHeadwords = word.k
+          ? word.k.filter((k) => !k.i?.includes('sK'))
+          : [];
+        const expr = kanjiHeadwords.length
+          ? kanjiHeadwords[0].ent
+          : (word.r[0]?.ent ?? '');
+
+        const readingsFiltered = word.r.filter((r) => !r.i?.includes('sk'));
+        const readingForAudio = readingsFiltered[0]?.ent ?? '';
+
+        try {
+          const storedFilename = (await browser.runtime.sendMessage({
+            type: 'ankiFetchAudio',
+            expression: expr,
+            reading: readingForAudio,
+          })) as string | '';
+
+          if (storedFilename) {
+            markerOverrides = {
+              'audio-file': storedFilename,
+              audio: `[sound:${storedFilename}]`,
+            };
+          }
+        } catch (e) {
+          // Don't block note creation on audio errors — fall back to placeholder
+          console.warn('Failed to fetch/store audio for Anki note', e);
+        }
+      }
+
+      const note = buildAnkiNote(
+        entry,
+        ankiSettings,
+        { url: window.location.href, documentTitle: document.title },
+        markerOverrides
+      );
+
+      // Force allowDuplicate to true on the AnkiConnect request.
+      //
+      // AnkiConnect's built-in duplicate check only compares the first
+      // field (sort field) of the note model, so words that share the
+      // same kanji but have different readings/meanings (e.g. 上手/じょうず
+      // vs 上手/かみて) would be silently rejected.
+      //
+      // Our own checkAnkiDuplicates() already performs a smarter
+      // duplicate check using findNotes (expression + reading), so by
+      // the time the user clicks "Add" the entry is guaranteed to not
+      // be a true duplicate. We therefore bypass AnkiConnect's check.
+      if (note.options) {
+        note.options.allowDuplicate = true;
+      }
+
+      const result = (await browser.runtime.sendMessage({
+        type: 'ankiAddNote',
+        note,
+      })) as { success: boolean; noteId?: number; error?: string };
+
+      if (result.success) {
+        this.ankiEntryStates.set(entryKey, 'added');
+      } else {
+        // Check if it's a duplicate error
+        if (result.error?.includes('duplicate')) {
+          this.ankiEntryStates.set(entryKey, 'duplicate');
+        } else {
+          this.ankiEntryStates.set(entryKey, 'error');
+          // Reset error after a delay
+          setTimeout(() => {
+            if (this.ankiEntryStates.get(entryKey) === 'error') {
+              this.ankiEntryStates.delete(entryKey);
+              this.updatePopup();
+            }
+          }, 3000);
+        }
+      }
+    } catch {
+      this.ankiEntryStates.set(entryKey, 'error');
+      setTimeout(() => {
+        if (this.ankiEntryStates.get(entryKey) === 'error') {
+          this.ankiEntryStates.delete(entryKey);
+          this.updatePopup();
+        }
+      }, 3000);
+    }
+
+    this.updatePopup();
+  }
+
+  private async checkAnkiDuplicates() {
+    const ankiSettings = this.config.ankiConnect;
+    if (!ankiSettings?.enabled || !this.currentSearchResult) {
+      return;
+    }
+
+    const result = this.currentSearchResult;
+    const entries: Array<{ key: string; entry: CopyEntry }> = [];
+
+    // Collect word entries
+    if (result.words?.data) {
+      for (const word of result.words.data) {
+        const key = `word-${word.id}`;
+        // Don't re-check entries we already know about
+        if (!this.ankiEntryStates.has(key)) {
+          entries.push({ key, entry: { type: 'word', data: word } });
+          this.ankiEntryStates.set(key, 'checking');
+        }
+      }
+    }
+
+    // Collect name entries
+    if (result.names?.data) {
+      for (let i = 0; i < result.names.data.length; i++) {
+        const name = result.names.data[i];
+        const key = `name-${i}`;
+        if (!this.ankiEntryStates.has(key)) {
+          entries.push({ key, entry: { type: 'name', data: name } });
+          this.ankiEntryStates.set(key, 'checking');
+        }
+      }
+    }
+
+    // Collect kanji entries
+    if (result.kanji?.data) {
+      for (const kanji of result.kanji.data) {
+        const key = `kanji-${kanji.c}`;
+        if (!this.ankiEntryStates.has(key)) {
+          entries.push({ key, entry: { type: 'kanji', data: kanji } });
+          this.ankiEntryStates.set(key, 'checking');
+        }
+      }
+    }
+
+    if (entries.length === 0) {
+      return;
+    }
+
+    this.updatePopup();
+
+    try {
+      // Build notes for all entries and check duplicates in one call
+      const notes = entries.map(({ entry }) =>
+        buildAnkiNote(entry, ankiSettings, {
+          url: window.location.href,
+          documentTitle: document.title,
+        })
+      );
+
+      const canAddResults = (await browser.runtime.sendMessage({
+        type: 'ankiCanAddNotes',
+        notes,
+      })) as Array<boolean>;
+
+      // Secondary verification for word entries flagged as duplicates.
+      //
+      // AnkiConnect's canAddNotes only compares the first field (the
+      // "sort field") of the note model. This means words that share
+      // the same kanji but have different readings (e.g. 上手/じょうず
+      // vs 上手/かみて) are falsely flagged as duplicates.
+      //
+      // For each suspected duplicate *word* entry we run a findNotes
+      // query that checks both expression AND reading in the note
+      // contents. If no note matches both, it was a false positive.
+      for (let i = 0; i < entries.length; i++) {
+        if (canAddResults[i]) {
+          continue; // Already marked as addable
+        }
+
+        const { entry } = entries[i];
+        if (entry.type !== 'word') {
+          continue; // Kanji/name first-field check is precise enough
+        }
+
+        const word = entry.data;
+        const kanjiHeadwords = word.k
+          ? word.k.filter((k) => !k.i?.includes('sK'))
+          : [];
+        const expression = kanjiHeadwords.length
+          ? kanjiHeadwords[0].ent
+          : (word.r[0]?.ent ?? '');
+        const readingsFiltered = word.r.filter((r) => !r.i?.includes('sk'));
+        const reading = readingsFiltered[0]?.ent ?? '';
+
+        // Only run the secondary check when expression ≠ reading
+        // (i.e. the word has kanji). For pure-kana words the
+        // first-field check is already exact.
+        if (!expression || !reading || expression === reading) {
+          continue;
+        }
+
+        try {
+          const queryParts: Array<string> = [];
+
+          // Respect duplicate scope — only filter by deck when not
+          // checking the whole collection.
+          if (ankiSettings.duplicateScope !== 'collection') {
+            queryParts.push(`deck:"${escapeAnkiQuery(ankiSettings.deckName)}"`);
+          }
+
+          queryParts.push(`note:"${escapeAnkiQuery(ankiSettings.modelName)}"`);
+          queryParts.push(`"${escapeAnkiQuery(expression)}"`);
+          queryParts.push(`"${escapeAnkiQuery(reading)}"`);
+
+          const noteIds = (await browser.runtime.sendMessage({
+            type: 'ankiFindNotes',
+            query: queryParts.join(' '),
+          })) as Array<number>;
+
+          if (noteIds.length === 0) {
+            // No note contains both expression AND reading —
+            // the canAddNotes result was a false positive.
+            canAddResults[i] = true;
+          }
+        } catch {
+          // On error, keep the conservative "duplicate" result
+        }
+      }
+
+      for (let i = 0; i < entries.length; i++) {
+        const { key } = entries[i];
+        // Only update if still in 'checking' state
+        if (this.ankiEntryStates.get(key) === 'checking') {
+          this.ankiEntryStates.set(
+            key,
+            canAddResults[i] ? 'available' : 'duplicate'
+          );
+        }
+      }
+    } catch {
+      // If the check fails, just clear the checking states
+      for (const { key } of entries) {
+        if (this.ankiEntryStates.get(key) === 'checking') {
+          this.ankiEntryStates.delete(key);
+        }
+      }
+    }
+
+    this.updatePopup();
+  }
+
   private async copyString(message: string, copyType: CopyType) {
     if (this.copyState.kind === 'inactive') {
       return;
@@ -2065,8 +2362,14 @@ export class ContentHandler {
     this.currentSearchResult = queryResult || undefined;
     this.currentTargetProps = targetProps;
 
+    // Clear Anki states when search results change
+    this.ankiEntryStates.clear();
+
     this.highlightTextForCurrentResult();
     this.showPopup();
+
+    // Check for duplicates in Anki after showing popup
+    void this.checkAnkiDuplicates();
   }
 
   showDictionary(
@@ -2243,6 +2546,7 @@ export class ContentHandler {
       isVerticalText: !!this.currentTargetProps?.isVerticalText,
       kanjiReferences: this.config.kanjiReferences,
       meta: this.currentLookupParams?.meta,
+      ...this.getAnkiPopupOptions(),
       onCancelCopy: () => this.exitCopyMode(),
       onExpandPopup: () => this.expandPopup(),
       onStartCopy: (index: number, trigger: 'touch' | 'mouse') =>
@@ -2269,6 +2573,7 @@ export class ContentHandler {
       pinShortcuts: this.config.keys.pinPopup,
       pointerType: this.currentTargetProps?.fromPuck ? 'puck' : 'cursor',
       popupStyle: this.config.popupStyle,
+      popupMinHeight: this.config.popupMinHeight,
       posDisplay: this.config.posDisplay,
       positionMode: this.popupPositionMode,
       preferredUnits: this.config.preferredUnits,
@@ -2691,6 +2996,15 @@ declare global {
     readerScriptVer?: string;
     removeReaderScript?: () => void;
   }
+}
+
+/**
+ * Escapes characters that are special in Anki's search query syntax.
+ * Used when building `findNotes` queries for duplicate verification.
+ */
+function escapeAnkiQuery(value: string): string {
+  // Inside double-quoted terms, only `"` and `\` are meaningful.
+  return value.replace(/["\\]/g, '');
 }
 
 (function () {

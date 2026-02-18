@@ -195,7 +195,10 @@
   }
 
   .container .window {
-    min-height: var(--tenten-min-height, none);
+    /* Enforce a sensible minimum popup height so a tiny result row doesn't
+       make the whole popup too small. Width remains controlled by
+       --tenten-max-width / existing layout rules. */
+    min-height: var(--tenten-min-height, 350px);
   }
 
   .window {
@@ -401,9 +404,10 @@
     color: var(--cell-highlight-fg);
   }
 
-  .tabs .tab:not([aria-selected]):hover {
-    filter: brightness(1.1);
-  }
+  /*.tabs .tab:not([aria-selected]):hover {
+    
+    filter: brightness(1.04);
+  } */
 
   .tabs .tab:not([aria-selected]):hover button {
     opacity: 1;
@@ -471,11 +475,12 @@
     background: var(--bg-color);
   }
 
+  /*
   .settings-button:hover,
   .pin-button:hover,
   .close .close-button:hover {
-    filter: brightness(1.1);
-  }
+    filter: brightness(1.04);
+  } */
 
   .settings-button svg,
   .pin-button svg,

@@ -42,6 +42,15 @@ export function renderPopup(
   }
 
   const host = options.container || getDefaultContainer();
+
+  // Apply configured minimum popup height (from user options) if supplied.
+  if (typeof options.popupMinHeight === 'number') {
+    host.style.setProperty(
+      '--tenten-min-height',
+      `${options.popupMinHeight}px`
+    );
+  }
+
   const windowElem = resetContainer({
     host,
     displayMode: options.displayMode,
@@ -171,8 +180,9 @@ export function renderPopup(
       break;
   }
 
-  // Render the copy overlay if needed
-  if (showOverlay(options.copyState)) {
+  // Render the copy overlay if needed.
+  // Skip the copy overlay when Anki is enabled — entries are added directly.
+  if (showOverlay(options.copyState) && !options.ankiEnabled) {
     overlayContainer.append(
       renderCopyOverlay({
         copyState: options.copyState,
