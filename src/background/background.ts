@@ -69,6 +69,7 @@ import { BackgroundRequestSchema } from './background-request';
 import { setDefaultToolbarIcon, updateBrowserAction } from './browser-action';
 import { calculateEraDateTimeSpan } from './calculate-date';
 import { registerMenuListeners, updateContextMenus } from './context-menus';
+import { loadFrequencyData } from './frequency-data';
 import { FxFetcher } from './fx-fetcher';
 import { isCurrentTabEnabled } from './is-current-tab-enabled';
 import type { JpdictStateWithFallback } from './jpdict';
@@ -279,6 +280,9 @@ const dbReady = (async () => {
 
   await config.ready;
   await initDb({ lang: config.dictLang, onUpdate: onDbStatusUpdated });
+
+  // Load word frequency data in parallel (non-blocking)
+  void loadFrequencyData();
 
   dbInitialized = true;
 

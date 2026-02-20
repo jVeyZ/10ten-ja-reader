@@ -7,6 +7,7 @@ import { toRomaji } from '../utils/romaji';
 
 import type { CandidateWord } from './deinflect';
 import { WordType, deinflect } from './deinflect';
+import { getFrequencyRank } from './frequency-data';
 import type {
   CandidateWordResult,
   DictionaryWordResult,
@@ -173,11 +174,22 @@ async function lookupCandidates({
   sortWordResults(candidateResults);
 
   // Convert to a flattened WordResult
-  return candidateResults.map<WordResult>((result) => ({
-    ...result,
-    r: result.r.map((r) => ({ ...r, romaji: toRomaji(r.ent) })),
-    matchLen: inputLength,
-  }));
+  return candidateResults.map<WordResult>((result) => {
+    // Use the matched headwords for the frequency lookup so that entries
+    // sharing the same kanji but with different readings (e.g. 生/なま vs
+    // 生/せい) resolve to their own rank.
+    const matchedKanji =
+      result.k?.find((k) => k.match)?.ent ?? result.k?.[0]?.ent;
+    const matchedKana = result.r.find((r) => r.match)?.ent ?? result.r[0]?.ent;
+    const frequencyRank = getFrequencyRank(matchedKanji, matchedKana);
+
+    return {
+      ...result,
+      r: result.r.map((r) => ({ ...r, romaji: toRomaji(r.ent) })),
+      matchLen: inputLength,
+      ...(frequencyRank !== undefined ? { frequencyRank } : {}),
+    };
+  });
 }
 
 async function lookupCandidate({

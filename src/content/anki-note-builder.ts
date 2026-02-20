@@ -216,11 +216,18 @@ function buildWordMarkers(
     'popup-selection-text': '',
     'sentence-furigana': '',
     'sentence-furigana-plain': '',
-    // Frequency markers — 10ten doesn't have frequency data
-    frequencies: '',
-    'frequency-harmonic-rank': '',
+    // Frequency markers — populated from bundled frequency data.
+    // {frequencies} emits Yomitan-compatible HTML so card templates that
+    // expect that structure render it inline rather than as a collapsible.
+    frequencies:
+      word.frequencyRank !== undefined
+        ? `<ul style="text-align: left;"><li>Global: ${word.frequencyRank}</li></ul>`
+        : '',
+    'frequency-harmonic-rank':
+      word.frequencyRank !== undefined ? String(word.frequencyRank) : '',
     'frequency-harmonic-occurrence': '',
-    'frequency-average-rank': '',
+    'frequency-average-rank':
+      word.frequencyRank !== undefined ? String(word.frequencyRank) : '',
     'frequency-average-occurrence': '',
     // Cloze markers
     'cloze-body': expression,

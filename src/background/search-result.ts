@@ -25,6 +25,8 @@ export type WordResult = Overwrite<
   reasonChains?: Array<Array<Reason>>;
   matchLen: number;
   sourceOffset?: number;
+  /** Global frequency rank from the bundled frequency list (1 = most common). */
+  frequencyRank?: number;
 };
 
 export type Sense = WordResult['s'][0];

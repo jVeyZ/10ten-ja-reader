@@ -155,7 +155,7 @@ export const ANKI_FIELD_MARKERS = [
   'clipboard-image',
   'clipboard-text',
   'popup-selection-text',
-  // Frequency (output empty — not available in 10ten)
+  // Frequency (populated from bundled frequency data)
   'frequencies',
   'frequency-harmonic-rank',
   'frequency-harmonic-occurrence',
