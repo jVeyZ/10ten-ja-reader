@@ -12,8 +12,10 @@
  * Both indexes are normalised to hiragana so that katakana forms in the CSV
  * (e.g. 眼鏡,メガネ) are matched by the dictionary's hiragana readings.
  *
- * Lookups try the composite key first so that e.g. 生/なま (2457) and
+ * Lookups use the composite key so that e.g. 生/なま (2457) and
  * 生/せい (3483) resolve to their own rank instead of sharing the lowest.
+ * When both a kanji-headword form and a kana-headword form exist (e.g.
+ * 故郷/ふるさと and ふるさと/ふるさと) the best (most common) rank is returned.
  */
 import { kanaToHiragana } from '@birchill/normal-jp';
 import browser from 'webextension-polyfill';
@@ -63,10 +65,12 @@ export function loadFrequencyData(): Promise<void> {
 /**
  * Look up the frequency rank for a word.
  *
- * When both kanjiHeadword and kanaReading are provided, ONLY the exact
- * composite "word\treading" key is tried.  This prevents e.g. 生/き from
- * incorrectly picking up 生/なま's rank, or 成る/なる from picking up the
- * kana-only なる frequency.
+ * When both kanjiHeadword and kanaReading are provided the composite
+ * "word\treading" key is tried first.  Additionally, when the kanji and kana
+ * differ, the kana-as-headword form ("kana\tkana") is also checked and the
+ * best (lowest = most common) rank is returned.  This handles words that can
+ * be written either in kanji or kana (e.g. 故郷 vs ふるさと) where the kana
+ * form may be far more frequent than the kanji form.
  *
  * The single-key fallback maps are only consulted when just one of the two
  * parameters is available (kana-only words, or kanji-only lookups).
@@ -84,10 +88,25 @@ export function getFrequencyRank(
   const normKanji = kanjiHeadword ? kanaToHiragana(kanjiHeadword) : undefined;
   const normKana = kanaReading ? kanaToHiragana(kanaReading) : undefined;
 
-  // When we have both kanji and reading, use ONLY the composite key.
-  // Falling back to individual keys would give the wrong reading's rank.
+  // When we have both kanji and reading, use the composite key for precision
+  // (avoids cross-reading contamination, e.g. 生/き vs 生/なま).
+  // We ALSO check the kana-as-headword form (e.g. ふるさと,ふるさと) because
+  // the same word may be written purely in kana far more often than it is
+  // written with kanji.  Return the best (most common = lowest rank) of the
+  // two so that e.g. 故郷/ふるさと (rank 233383) correctly reports the
+  // ふるさと kana-form rank (17845) when that is more common.
   if (normKanji && normKana) {
-    return pairMap.get(normKanji + '\t' + normKana);
+    const kanjiFormRank = pairMap.get(normKanji + '\t' + normKana);
+    // Only check kana-as-headword when kanji and kana actually differ
+    const kanaFormRank =
+      normKanji !== normKana
+        ? pairMap.get(normKana + '\t' + normKana)
+        : undefined;
+
+    if (kanjiFormRank !== undefined && kanaFormRank !== undefined) {
+      return Math.min(kanjiFormRank, kanaFormRank);
+    }
+    return kanjiFormRank ?? kanaFormRank;
   }
 
   // Kanji-only lookup (no reading available)

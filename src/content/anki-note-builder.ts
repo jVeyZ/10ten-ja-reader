@@ -26,6 +26,12 @@ export interface AnkiNoteContext {
   documentTitle?: string;
   /** The sentence containing the word. */
   sentence?: string;
+  /** Example sentence from Tatoeba (Japanese). */
+  sampleSentence?: string;
+  /** Example sentence translation from Tatoeba (English). */
+  sampleSentenceTranslated?: string;
+  /** Example sentence furigana from Tatoeba transcription. */
+  sampleSentenceFurigana?: string;
 }
 
 /**
@@ -204,6 +210,9 @@ function buildWordMarkers(
     'pitch-accent-categories': pitchCategories.join(', '),
     'pitch-accents': pitchPositions.join(', '),
     sentence: context?.sentence ?? '',
+    'sample-sentence': context?.sampleSentence ?? '',
+    'sample-sentence-translated': context?.sampleSentenceTranslated ?? '',
+    'sample-sentence-furigana': context?.sampleSentenceFurigana ?? '',
     url: context?.url ?? '',
     'document-title': context?.documentTitle ?? '',
     'search-query': expression,
@@ -214,8 +223,10 @@ function buildWordMarkers(
     'clipboard-image': '',
     'clipboard-text': '',
     'popup-selection-text': '',
-    'sentence-furigana': '',
-    'sentence-furigana-plain': '',
+    'sentence-furigana': context?.sampleSentenceFurigana ?? '',
+    'sentence-furigana-plain': context?.sampleSentenceFurigana
+      ? context.sampleSentenceFurigana.replace(/<[^>]+>/g, '')
+      : '',
     // Frequency markers — populated from bundled frequency data.
     // {frequencies} emits Yomitan-compatible HTML so card templates that
     // expect that structure render it inline rather than as a collapsible.
@@ -274,6 +285,13 @@ function buildKanjiMarkers(
     url: context?.url ?? '',
     'document-title': context?.documentTitle ?? '',
     sentence: context?.sentence ?? '',
+    'sample-sentence': context?.sampleSentence ?? '',
+    'sample-sentence-translated': context?.sampleSentenceTranslated ?? '',
+    'sample-sentence-furigana': context?.sampleSentenceFurigana ?? '',
+    'sentence-furigana': context?.sampleSentenceFurigana ?? '',
+    'sentence-furigana-plain': context?.sampleSentenceFurigana
+      ? context.sampleSentenceFurigana.replace(/<[^>]+>/g, '')
+      : '',
     furigana: kanji.c,
     'furigana-plain': kanji.c,
     tags: '',
@@ -330,6 +348,13 @@ function buildNameMarkers(
     url: context?.url ?? '',
     'document-title': context?.documentTitle ?? '',
     sentence: context?.sentence ?? '',
+    'sample-sentence': context?.sampleSentence ?? '',
+    'sample-sentence-translated': context?.sampleSentenceTranslated ?? '',
+    'sample-sentence-furigana': context?.sampleSentenceFurigana ?? '',
+    'sentence-furigana': context?.sampleSentenceFurigana ?? '',
+    'sentence-furigana-plain': context?.sampleSentenceFurigana
+      ? context.sampleSentenceFurigana.replace(/<[^>]+>/g, '')
+      : '',
     tags: '',
     'tags-pos': '',
     'part-of-speech': '',

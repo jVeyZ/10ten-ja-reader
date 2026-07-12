@@ -166,6 +166,10 @@ export const ANKI_FIELD_MARKERS = [
   // Dictionary info
   'dictionary',
   'dictionary-alias',
+  // Sample sentences fetched from Tatoeba
+  'sample-sentence',
+  'sample-sentence-translated',
+  'sample-sentence-furigana',
   // Kanji-specific
   'character',
   'onyomi',

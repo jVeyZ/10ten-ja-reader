@@ -105,6 +105,10 @@ export const BackgroundRequestSchema = discriminator('type', {
   // Search for notes matching an Anki query string.
   // Used for more precise duplicate verification (expression + reading).
   ankiFindNotes: s.type({ query: s.string() }),
+  ankiFetchTatoebaExample: s.type({
+    expression: s.string(),
+    reading: s.optional(s.string()),
+  }),
 
   //
   // Requests to be forwarded to different frames

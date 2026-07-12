@@ -705,6 +705,28 @@ browser.runtime.onMessage.addListener(
           }
         })();
 
+      case 'ankiFetchTatoebaExample':
+        return (async () => {
+          try {
+            const result = await fetchTatoebaExampleSentence(
+              request.expression,
+              request.reading
+            );
+            return {
+              sampleSentence: result?.sentence ?? '',
+              sampleSentenceTranslated: result?.translation ?? '',
+              sampleSentenceFurigana: result?.furigana ?? '',
+            };
+          } catch (e) {
+            console.error('ankiFetchTatoebaExample error:', e);
+            return {
+              sampleSentence: '',
+              sampleSentenceTranslated: '',
+              sampleSentenceFurigana: '',
+            };
+          }
+        })();
+
       case 'ankiAddNote':
         return (async () => {
           try {
@@ -839,6 +861,96 @@ browser.runtime.onMessage.addListener(
     return undefined;
   }
 );
+
+function convertBracketFuriganaToHtml(bracketText: string): string {
+  return bracketText.replace(/\[([^|\]]+)\|([^\]]+)\]/g, (_match, t, r) => {
+    return `<ruby>${t}<rp>（</rp><rt>${r}</rt><rp>）</rp></ruby>`;
+  });
+}
+
+async function fetchTatoebaExampleSentence(
+  expression: string,
+  reading?: string
+): Promise<{ sentence: string; translation: string; furigana: string } | null> {
+  const query = (reading || expression || '').trim();
+  if (!query) {
+    return null;
+  }
+
+  const url = new URL('https://tatoeba.org/en/api_v0/search');
+  url.searchParams.set('from', 'jpn');
+  url.searchParams.set('to', 'eng');
+  url.searchParams.set('query', query);
+  url.searchParams.set('page', '1');
+  url.searchParams.set('sort', 'popular');
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    return null;
+  }
+
+  type TatoebaTranslation = { lang?: string; text?: string };
+
+  type TatoebaTranscription = { script?: string; text?: string; html?: string };
+
+  type TatoebaResult = {
+    text?: string;
+    lang?: string;
+    translations?: Array<Array<TatoebaTranslation>>;
+    transcriptions?: Array<TatoebaTranscription>;
+  };
+
+  const data = (await response.json()) as { results?: Array<TatoebaResult> };
+
+  if (!data || !Array.isArray(data.results) || data.results.length === 0) {
+    return null;
+  }
+
+  const candidate = data.results.find((result) => {
+    if (
+      !result.text ||
+      result.lang !== 'jpn' ||
+      result.text.trim().length < 10
+    ) {
+      return false;
+    }
+
+    const allTranslations = (result.translations ?? []).flat();
+    return allTranslations.some(
+      (t) =>
+        (t.lang === 'eng' || t.lang === 'en') &&
+        typeof t.text === 'string' &&
+        t.text.trim().length > 0
+    );
+  });
+
+  const first = candidate || data.results[0];
+  if (!first || !first.text) {
+    return null;
+  }
+
+  const sentence = first.text;
+  const allTranslations = (first.translations ?? []).flat();
+  const translation =
+    allTranslations.find((t) => (t.lang === 'eng' || t.lang === 'en') && t.text)
+      ?.text ||
+    allTranslations.find((t) => t.text)?.text ||
+    '';
+
+  const transcription =
+    first.transcriptions?.find(
+      (t) => t.script === 'Hrkt' && (t.html || t.text)
+    ) || first.transcriptions?.find((t) => t.html || t.text);
+
+  let furigana = '';
+  if (transcription?.html) {
+    furigana = transcription.html;
+  } else if (transcription?.text) {
+    furigana = convertBracketFuriganaToHtml(transcription.text);
+  }
+
+  return { sentence, translation, furigana };
+}
 
 browser.runtime.onInstalled.addListener(async (details) => {
   // Request persistent storage permission

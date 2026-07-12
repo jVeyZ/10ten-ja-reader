@@ -1842,10 +1842,52 @@ export class ContentHandler {
         }
       }
 
+      let sampleSentence = '';
+      let sampleSentenceTranslated = '';
+      let sampleSentenceFurigana = '';
+
+      if (entry.type === 'word') {
+        const word = entry.data;
+        const kanjiHeadwords = word.k
+          ? word.k.filter((k) => !k.i?.includes('sK'))
+          : [];
+        const expression = kanjiHeadwords.length
+          ? kanjiHeadwords[0].ent
+          : (word.r[0]?.ent ?? '');
+
+        const readingsFiltered = word.r.filter((r) => !r.i?.includes('sk'));
+        const readingForQuery = readingsFiltered[0]?.ent ?? '';
+        const queryForTatoeba = readingForQuery || expression;
+
+        try {
+          const tatoeba = (await browser.runtime.sendMessage({
+            type: 'ankiFetchTatoebaExample',
+            expression: queryForTatoeba,
+            reading: readingForQuery,
+          })) as {
+            sampleSentence?: string;
+            sampleSentenceTranslated?: string;
+            sampleSentenceFurigana?: string;
+          };
+
+          sampleSentence = tatoeba?.sampleSentence ?? '';
+          sampleSentenceTranslated = tatoeba?.sampleSentenceTranslated ?? '';
+          sampleSentenceFurigana = tatoeba?.sampleSentenceFurigana ?? '';
+        } catch (e) {
+          console.warn('Failed to fetch Tatoeba sample sentence', e);
+        }
+      }
+
       const note = buildAnkiNote(
         entry,
         ankiSettings,
-        { url: window.location.href, documentTitle: document.title },
+        {
+          url: window.location.href,
+          documentTitle: document.title,
+          sampleSentence,
+          sampleSentenceTranslated,
+          sampleSentenceFurigana,
+        },
         markerOverrides
       );
 
